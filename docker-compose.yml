@@ -1,0 +1,41 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: study-buddy-db
+    environment:
+      POSTGRES_DB: studybuddy
+      POSTGRES_USER: studybuddy
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-studybuddy}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U studybuddy -d studybuddy"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    container_name: study-buddy-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: studybuddy
+      DB_USER: studybuddy
+      DB_PASSWORD: ${DB_PASSWORD:-studybuddy}
+      AI_API_KEY: ${AI_API_KEY:?请在 .env 中设置 DeepSeek API Key}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:?请在 .env 中设置智谱 API Key}
+      CHAT_BASE_URL: ${CHAT_BASE_URL:-https://api.deepseek.com}
+      CHAT_MODEL: ${CHAT_MODEL:-deepseek-chat}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-https://open.bigmodel.cn/api/paas/v4}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-embedding-3}
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:

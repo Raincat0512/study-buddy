@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>学习助手 · 资料库</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <span class="logo">📚 学习助手</span>
+  <nav>
+    <a href="index.html" class="active">资料库</a>
+    <a href="chat.html">对话</a>
+  </nav>
+</header>
+
+<main>
+  <div class="card">
+    <h2>导入学习资料</h2>
+    <label for="file">上传文件（.txt / .md / .pdf，仅抽取纯文本）</label>
+    <input type="file" id="file" accept=".txt,.md,.markdown,.pdf">
+
+    <label for="url">或输入网页链接</label>
+    <input type="url" id="url" placeholder="https://example.com/article">
+
+    <button id="ingestFileBtn" onclick="ingestFile()">上传文件导入</button>
+    <button id="ingestUrlBtn" onclick="ingestUrl()">抓取网页导入</button>
+    <div id="ingestError" class="error"></div>
+  </div>
+
+  <div class="card">
+    <h2>资料列表</h2>
+    <div id="docList"><div class="empty">加载中…</div></div>
+  </div>
+</main>
+
+<script>
+async function loadDocs() {
+  const box = document.getElementById('docList');
+  try {
+    const res = await fetch('/api/documents');
+    const docs = await res.json();
+    if (!docs.length) {
+      box.innerHTML = '<div class="empty">还没有资料，先导入一篇试试</div>';
+      return;
+    }
+    box.innerHTML = docs.map(d => `
+      <div class="doc">
+        <div class="title-row">
+          <span class="title">${esc(d.title)}<span class="badge ${d.status}">${d.status}</span><span class="badge">${d.sourceType}</span></span>
+          <button class="ghost" onclick="removeDoc(${d.id})">删除</button>
+        </div>
+        <div class="tags">${(d.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
+        <div class="summary">${esc(d.summary || '（无摘要）')}</div>
+        <div class="summary">${d.charCount} 字符 · ${esc(d.sourceRef || '')}</div>
+      </div>
+    `).join('');
+  } catch (e) {
+    box.innerHTML = `<div class="error">加载失败：${esc(String(e))}</div>`;
+  }
+}
+
+async function ingestFile() {
+  const input = document.getElementById('file');
+  const btn = document.getElementById('ingestFileBtn');
+  if (!input.files.length) { showError('请先选择文件'); return; }
+  const form = new FormData();
+  form.append('file', input.files[0]);
+  await submitIngest(btn, form, null);
+}
+
+async function ingestUrl() {
+  const url = document.getElementById('url').value.trim();
+  const btn = document.getElementById('ingestUrlBtn');
+  if (!url) { showError('请输入网页链接'); return; }
+  await submitIngest(btn, null, url);
+}
+
+async function submitIngest(btn, form, url) {
+  showError('');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>导入中（含摘要与向量化，约 10-30 秒）…';
+  try {
+    const res = form
+      ? await fetch('/api/documents/file', { method: 'POST', body: form })
+      : await fetch('/api/documents/url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    document.getElementById('file').value = '';
+    document.getElementById('url').value = '';
+    await loadDocs();
+  } catch (e) {
+    showError('导入失败：' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = form ? '上传文件导入' : '抓取网页导入';
+  }
+}
+
+async function removeDoc(id) {
+  if (!confirm('删除该资料及其全部分块？')) return;
+  await fetch(`/api/documents/${id}`, { method: 'DELETE' });
+  loadDocs();
+}
+
+function showError(msg) {
+  document.getElementById('ingestError').textContent = msg;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+loadDocs();
+</script>
+</body>
+</html>

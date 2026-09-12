@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: study-buddy
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:studybuddy}
+    username: ${DB_USER:studybuddy}
+    password: ${DB_PASSWORD:studybuddy}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: 15MB
+      max-request-size: 15MB
+  ai:
+    openai:
+      # 对话模型走 DeepSeek（OpenAI 兼容协议）
+      chat:
+        base-url: ${CHAT_BASE_URL:https://api.deepseek.com}
+        api-key: ${AI_API_KEY:}
+        options:
+          model: ${CHAT_MODEL:deepseek-chat}
+          temperature: 0.7
+      # 向量模型走智谱 embedding-3（OpenAI 兼容协议，2048 维）
+      embedding:
+        base-url: ${EMBEDDING_BASE_URL:https://open.bigmodel.cn/api/paas/v4}
+        api-key: ${EMBEDDING_API_KEY:}
+        embeddings-path: /embeddings
+        options:
+          model: ${EMBEDDING_MODEL:embedding-3}
+    vectorstore:
+      pgvector:
+        dimensions: 2048
+        initialize-schema: true
+
+app:
+  chunk-size: 500
+  chunk-overlap: 80
+  max-source-chars: 100000
+  rag:
+    top-k: 4
+    similarity-threshold: 0.30
+    history-messages: 10
+
+server:
+  port: 8080

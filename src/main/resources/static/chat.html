@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>学习助手 · 对话</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .chat-box {
+      height: 60vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 8px 2px;
+    }
+    .msg {
+      max-width: 85%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .msg.user {
+      align-self: flex-end;
+      background: var(--primary);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .msg.assistant {
+      align-self: flex-start;
+      background: #eef1f5;
+      border-bottom-left-radius: 4px;
+    }
+    .input-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .input-row input {
+      flex: 1;
+    }
+    .input-row button {
+      margin-top: 0;
+    }
+  </style>
+</head>
+<body>
+<header>
+  <span class="logo">📚 学习助手</span>
+  <nav>
+    <a href="index.html">资料库</a>
+    <a href="chat.html" class="active">对话</a>
+  </nav>
+</header>
+
+<main>
+  <div class="card">
+    <div class="title-row" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h2 style="margin:0">对话</h2>
+      <button class="ghost" onclick="resetChat()" style="color:var(--muted)">清空会话</button>
+    </div>
+    <div id="chatBox" class="chat-box">
+      <div class="msg assistant">把课件、笔记或文章导入资料库后，就可以在这里问我啦。例如："我这学期讲过死锁吗？" / "我有哪些关于面试的资料？"</div>
+    </div>
+    <div class="input-row">
+      <input type="text" id="question" placeholder="输入问题，回车发送" onkeydown="if(event.key==='Enter')send()">
+      <button id="sendBtn" onclick="send()">发送</button>
+    </div>
+    <div id="chatError" class="error"></div>
+  </div>
+</main>
+
+<script>
+let sessionId = localStorage.getItem('studybuddy_session');
+if (!sessionId) {
+  sessionId = crypto.randomUUID();
+  localStorage.setItem('studybuddy_session', sessionId);
+}
+
+const chatBox = document.getElementById('chatBox');
+
+async function loadHistory() {
+  try {
+    const res = await fetch(`/api/chat/history?sessionId=${encodeURIComponent(sessionId)}`);
+    const items = await res.json();
+    if (items.length) {
+      chatBox.innerHTML = '';
+      for (const m of items) {
+        appendMsg(m.role === 'user' ? 'user' : 'assistant', m.content);
+      }
+      scrollBottom();
+    }
+  } catch (e) { /* 忽略历史加载失败 */ }
+}
+
+async function send() {
+  const input = document.getElementById('question');
+  const btn = document.getElementById('sendBtn');
+  const q = input.value.trim();
+  if (!q) return;
+  showError('');
+  input.value = '';
+  btn.disabled = true;
+  appendMsg('user', q);
+  const loading = appendMsg('assistant', '思考中…（检索资料 + 生成回答）');
+  scrollBottom();
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, message: q })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    loading.textContent = data.answer || '（空回答）';
+  } catch (e) {
+    loading.remove();
+    appendMsg('assistant', '出错了：' + e.message);
+    showError(e.message);
+  } finally {
+    btn.disabled = false;
+    scrollBottom();
+  }
+}
+
+async function resetChat() {
+  if (!confirm('清空当前会话历史？')) return;
+  await fetch(`/api/chat?sessionId=${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
+  chatBox.innerHTML = '<div class="msg assistant">已清空。问点什么吧！</div>';
+}
+
+function appendMsg(role, text) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  div.textContent = text;
+  chatBox.appendChild(div);
+  scrollBottom();
+  return div;
+}
+
+function scrollBottom() {
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function showError(msg) {
+  document.getElementById('chatError').textContent = msg;
+}
+
+loadHistory();
+</script>
+</body>
+</html>
