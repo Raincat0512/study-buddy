@@ -91,17 +91,3 @@ mvn spring-boot:run
 | GET/DELETE | `/api/documents/{id}` | 详情 / 删除（含向量清理） |
 | POST | `/api/chat` | `{"sessionId","message"}` → `{"answer"}` |
 | GET/DELETE | `/api/chat/history?sessionId=` / `/api/chat?sessionId=` | 历史 / 清空会话 |
-
-## 已知限制（v1 明确不做）
-
-- PDF 只抽纯文本：图片、表格、PPT、扫描件不支持（无 OCR）
-- 网页正文不做算法级正文提取，取 body 全文
-- 无登录、单用户；无流式输出（回答整段返回）
-- 标签检索是 LIKE 包含匹配，不是标签体系管理
-
-## Future Work
-
-- SSE 流式输出；导入改异步任务 + 进度
-- 混合检索（BM25 + 向量）与重排（rerank）
-- 标签体系化 + 按标签浏览；摘要再生成
-- 复习提醒（间隔重复）
